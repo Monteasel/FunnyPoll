@@ -1,0 +1,25 @@
+extends generalSetup.pug
+
+block styles
+    link(rel="stylesheet" href="/displayQuestionGraphStyle.css")
+
+
+block content
+    a(href="/").returnLink Zurück zu Fragen
+    h1.questionTitle #{result.question}
+    .form-check.authorCheckContainer
+        input(type="checkbox" id="authorToggle" onclick="ToggleAuthor()").form-check-input
+        label(for="authorToggle").form-check-label Frage von 
+            span(id="authorDisplayText").authorDisplayText #{result.author}
+
+    <iframe width="1920" height="1080" class="graph" src="https://lookerstudio.google.com/embed/reporting/3f867b2f-7ca8-44cb-81ef-d212db645093/page/iTk7D" frameborder="0" style="border:0" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+
+    .form-check
+        input(type="checkbox" id="nameToggle" onclick="ToggleNames()").form-check-input
+        label(for="nameToggle").form-check-label Namen anzeigen
+    div(class="allChooserGroups" id="allChooserGroups")
+        each values, key in result.nameDistribution
+            div(class="optionChooserGroup")
+                each value in values
+                    p #{value}
+    script(src="../toggleContent.js")

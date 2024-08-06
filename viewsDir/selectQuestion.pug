@@ -1,0 +1,16 @@
+extends generalSetup.pug
+
+block styles 
+    link(rel="stylesheet" href="./selectQuestionStyle.css")
+
+block content
+    .allDifficultyContainer
+        each difficulty in result.difficulties
+            .difficultyContainer
+                .difficultyText(class=difficulty === "Easy" ? "text-info" : difficulty === "Mid" ? "text-warning" : difficulty === "Hard" ? "text-danger" : diffculty === "Good luck" ? "text-dark" : "") #{difficulty}
+                .card-columns
+                    each questionTitle in result.twoOptionDifficultySplit[difficulty]
+                        a(href="/questionSite/" + questionTitle).questionLink
+                            div.card.cardStyle.bg-transparent(class=result.visitedQuestions.includes(questionTitle) ? "bg-danger text-white" : "" + difficulty === "Easy" ? "border-info text-info" : difficulty === "Mid" ? "border-warning text-warning" : difficulty === "Hard" ? "border-danger text-danger" : diffculty === "Good luck" ? "border-dark text-white" : "")                                                    
+                                .card-body.bg-transparent
+                                    .card-text #{questionTitle}
