@@ -1,0 +1,40 @@
+.allDifficultyContainer {
+    display: flex;
+    justify-content: space-evenly;
+}
+
+.difficultyContainer {
+    text-align: center;
+}
+
+.difficultyText {
+    font-size: 50px;
+    padding: 50px;
+}
+
+.cardStyle {
+    width: 500px;
+    margin-bottom: 20px;
+}
+
+.card-text {
+    font-size: 25px;
+}
+
+.questionLink {
+    color: black;
+    text-decoration: none;
+}
+
+.questionLink:link,
+.questionLink:visited,
+.questionLink:hover,
+.questionLink:active {
+    color: black;
+    text-decoration: none;
+}
+
+.card-columns {
+    column-count: 2;
+    margin: auto 20px;
+}
