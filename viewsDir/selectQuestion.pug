@@ -7,10 +7,10 @@ block content
     .allDifficultyContainer
         each difficulty in result.difficulties
             .difficultyContainer
-                .difficultyText(class=difficulty === "Easy" ? "text-info" : difficulty === "Mid" ? "text-warning" : difficulty === "Hard" ? "text-danger" : diffculty === "Good luck" ? "text-dark" : "") #{difficulty}
+                .difficultyText(class=difficulty === "Easy" ? "text-info" : difficulty === "Mid" ? "text-warning" : difficulty === "Hard" ? "text-danger" : difficulty === "Good luck" ? "text-success" : "") #{difficulty}
                 .card-columns
-                    each questionTitle in result.twoOptionDifficultySplit[difficulty]
-                        a(href="/questionSite/" + questionTitle).questionLink
-                            div.card.cardStyle.bg-transparent(class=result.visitedQuestions.includes(questionTitle) ? "bg-danger text-white" : "" + difficulty === "Easy" ? "border-info text-info" : difficulty === "Mid" ? "border-warning text-warning" : difficulty === "Hard" ? "border-danger text-danger" : diffculty === "Good luck" ? "border-dark text-white" : "")                                                    
+                    each questionObject in result.optionDifficultySplit[difficulty]
+                        a(href="/questionSite/" + questionObject.questionTitleURL + "/" + questionObject.questionEndsWithQuestionMark).questionLink
+                            div.card.cardStyle.bg-transparent(class=result.visitedQuestions.includes(questionObject.questionTitleNormal) ? "border-light text-white" : "" + difficulty === "Easy" ? "border-info text-info" : difficulty === "Mid" ? "border-warning text-warning" : difficulty === "Hard" ? "border-danger text-danger" : difficulty === "Good luck" ? "border-success text-success" : "")                                                    
                                 .card-body.bg-transparent
-                                    .card-text #{questionTitle}
+                                    .card-text #{questionObject.questionTitleNormal}

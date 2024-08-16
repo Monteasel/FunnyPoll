@@ -121,7 +121,7 @@ app.set("views", "viewsDir");
 app.set("view engine", "pug");
 //turn on serving static files (required for delivering css to client)
 app.use(express.static("public"));
-app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+app.listen(PORT, () => console.log(`Server listening on Port ${PORT}`));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -132,60 +132,92 @@ let visitedQuestions = [];
 app.get("/", async (req,res) => {
     let result = {};
     
-    await GetTwoOptionFormQuestions().then(twoOptionQuestions => 
-        SplitTwoOptionQuestionsIntoDifficulties(twoOptionQuestions).then(questionsSplitIntoDifficulties => 
-            result.twoOptionDifficultySplit = questionsSplitIntoDifficulties
-        )
+    let diffArr = {};
+    diffArr.Easy = [];
+    diffArr.Mid = [];
+    diffArr.Hard = [];
+    diffArr["Good luck"] = [];
+
+    await GetFormQuestionsWithSpecificOptionsAmount(2).then(twoOptionQuestions => 
+        SplitTwoOptionQuestionsIntoDifficulties(twoOptionQuestions, diffArr)  
     );
+
+    await GetFormQuestionsWithSpecificOptionsAmount(3).then(threeOptionQuestions => 
+        SplitThreeOptionQuestionsIntoDifficulties(threeOptionQuestions, diffArr)  
+    );
+
+    await GetFormQuestionsWithSpecificOptionsAmount(4).then(fourOptionQuestions => 
+        SplitFourOptionQuestionsIntoDifficulties(fourOptionQuestions, diffArr)  
+    );
+
+    for(const [key, value] of Object.entries(diffArr)) {
+        diffArr[key] = [];
+        value.forEach(question => {
+            let questionObj = {};
+            questionObj.questionTitleNormal = question;
+            questionObj.questionTitleURL = GetByURLUsableQuestionTitle(question);
+            questionObj.questionEndsWithQuestionMark = question[question.length-1] === "?";
+            diffArr[key].push(questionObj);
+        });
+    }
+
+    result.optionDifficultySplit = diffArr
     
-
-
-    // result.twoOptionDifficultySplit.Mid.push("Bestes Element?");
-    // result.twoOptionDifficultySplit.Mid.push("Man ist für 30 Tage in einem Raum mit einem Bett, Badezimmer, Computer mit Internet, unendlich Essensvorräte und nicht alkoholische Getränke eingesperrt. Man hat folgende 4 Optionen die man mitnehmen kann:");
-    // result.twoOptionDifficultySplit.Hard.push("Lieblingsjahreszeit?");
-    result.twoOptionDifficultySplit.Hard.push("Wer ist stärker?");
-    // result.twoOptionDifficultySplit.Hard.push("Deine Reaktion wenn du eine Katze siehst?");
-    // result.twoOptionDifficultySplit.Hard.push("Coolstes Element im Periodensystem?");
-    result.twoOptionDifficultySplit.Hard.push("Wie oft wischst du nach dem Scheißen?");
-    // result.twoOptionDifficultySplit["Good luck"].push("Du siehst 4 verschieden Leute etwas in einem Supermarkt stehlen und du musst einen reporten. Wen würdest du am ehesten reporten:");
-    
-
-
+    console.log(diffArr.Hard);
+    console.log("vT: " + visitedQuestions);
 
     result.visitedQuestions = visitedQuestions;
     result.difficulties = ['Easy', 'Mid', 'Hard', 'Good luck'];
-    // console.log(result);
+    console.log(result);
     res.render("selectQuestion", {result});
 });
 
 
-app.get("/questionSite/:questionTitle", async (req,res) => {
+app.get("/questionSite/:questionTitle/:questionEndsWithQuestionMark", async (req,res) => {
     let questionTitle = req.params.questionTitle;
+    let questionEndsWithQuestionMark = req.params.questionEndsWithQuestionMark;
 
-    if(questionTitle.charAt(questionTitle.length-1) !== ':')
-        questionTitle = req.params.questionTitle + "?";   // Add ? cause ? is at end of url and doesn't get recognised when parsed (? is for parameters)
+    questionTitle = ParseBackFromURL( req.params.questionTitle );
+
+    if(questionEndsWithQuestionMark.toLowerCase() === "true")
+        questionTitle = questionTitle + "?";
+    // if(!/[.:!]/.test( questionTitle.charAt(questionTitle.length-1) ))
+    //     questionTitle = questionTitle + "?";    // Add ? cause ? is at end of url and doesn't get recognised when parsed (? is for parameters)
     visitedQuestions.push(questionTitle);
+
+
+    let optionAmount;
     for(const row of cachedSubmitRows) {
         if(row.get("Frage") === questionTitle) {
-            row.set("hasBeenUsedInGame", "TRUE");
+            optionAmount = row.get("Anzahl Optionen");
         }
     }
 
     let result = {};
-    await GetNameDistribution(questionTitle).then( nameDistribution => {
+    await GetNameDistribution(questionTitle, optionAmount, true).then( nameDistribution => {
+        RemoveOptionsNoOneAnswered(nameDistribution);
         result.nameDistribution = nameDistribution;
         result.question = questionTitle;
 
-        if(questionTitle === "Würdest du lieber unendlich viel Bacon haben, aber keine Videospiele oder unendlich Videospiele aber keine Videospiele?")
-            result.author = "Roman, Paul, Domi";
-        else
-            result.author = GetQuestionAuthor(questionTitle);
+        result.author = GetQuestionAuthor(questionTitle);
             
         console.log({result});
-// Bacon von roman paul domi
-        // Bacon von roman paul domi
+
         res.render("displayQuestionStats", {result});
     });
+});
+
+
+process.on("SIGINT", async () => {
+    for(const row of cachedSubmitRows) {
+        if(visitedQuestions.includes( row.get("Frage") )) {
+            console.log(`Saving ${row.get("Frage")} finished`);
+            row.set("hasBeenUsedInGame", "TRUE");
+            await row.save();
+        }
+    }
+    console.log("All visited questions marked in database. Terminal and tab can be closed");
+    process.exit(0);
 });
 
 
@@ -246,37 +278,49 @@ function checkAllReady() {
 }
 
 
-async function GetQuestionOptions(question) {
+async function GetQuestionOptions(question, optionAmount) {
     // Returns options into object array
     let questionOptions = [];
 
     for(const submitSheetQuestion of cachedSubmitRows) {
 
         if(submitSheetQuestion.get("Frage") === question) {
-            questionOptions.push( submitSheetQuestion.get("1. Option") );
-            questionOptions.push( submitSheetQuestion.get("2. Option") );
+            if(optionAmount >= 2) {
+                questionOptions.push( submitSheetQuestion.get("1. Option") );
+                questionOptions.push( submitSheetQuestion.get("2. Option") );
+            }
+            if(optionAmount >= 3) {
+                questionOptions.push( submitSheetQuestion.get("3. Option") );
+            }
+            if(optionAmount == 4) {
+                questionOptions.push( submitSheetQuestion.get("4. Option") );
+            }
         }
     }
 
-    // Extract options from object array
-    //let formQuestionOptionsClean = [];
-    // for(const formOption of formQuestionOptionsUnclean)
-    //     formQuestionOptionsClean.push(formOption.value);
-
-    // console.log(formQuestionOptionsClean);
     return questionOptions;
 }
 
-async function GetNameDistribution(question) {
+async function GetNameDistribution(question, optionAmount, includeEmptyFields) {
     let nameDistribution = {};
-    const options = await GetQuestionOptions(question);
+    const options = await GetQuestionOptions(question, optionAmount);
     options.sort();
 
+    if(includeEmptyFields) {
+        for(const row of cachedAnswerRows) {
+            if(row.get(question) === undefined) {
+                nameDistribution["!"] = {};   
+            }
+        }
+    }
+
     for(const option of options) {
+        console.log("option: " + option);
         nameDistribution[option] = [];
         for(const row of cachedAnswerRows) {
             if(row.get(question) === option) {
                 const name = row.get("Name");
+                console.log("name: " + name);
                 nameDistribution[option].push(name);
             }
         }
@@ -286,42 +330,55 @@ async function GetNameDistribution(question) {
 }
 
 
+function RemoveOptionsNoOneAnswered(nameDistribution) {
+    for(const key in nameDistribution) {
+        if(nameDistribution[key].length === 0) {
+            delete nameDistribution[key];
+        }
+    }
+}
 
 
-
-async function GetTwoOptionFormQuestions()
+async function GetFormQuestionsWithSpecificOptionsAmount(optionAmount)
 {
-    let twoOptionFormQuestions = [];
+    let optionFormQuestions = [];
 
     for(const row of cachedSubmitRows) {
         const optionCount = row.get("Anzahl Optionen");
         const hasBeenUsedInPoll = String(row.get("hasBeenUsedInPoll")).toLowerCase() === "true";
         const hasBeenUsedInGame = String(row.get("hasBeenUsedInGame")).toLowerCase() === "true";
 
-        if(optionCount == 2 && hasBeenUsedInPoll && !hasBeenUsedInGame) {
+        if(optionCount == optionAmount && hasBeenUsedInPoll && !hasBeenUsedInGame) {
             const questionTitle = row.get("Frage");
-            twoOptionFormQuestions.push(questionTitle);
+            optionFormQuestions.push(questionTitle);
         }
     }
     
-    return twoOptionFormQuestions;
+    return optionFormQuestions;
 }
 
 
 
-async function SplitTwoOptionQuestionsIntoDifficulties(questions) {
-    let diffArr = {};
-    diffArr.Easy = [];
-    diffArr.Mid = [];
-    diffArr.Hard = [];
-    diffArr["Good luck"] = [];
+async function SplitTwoOptionQuestionsIntoDifficulties(questions, diffArr) {
     for(let question of questions) {
         const difference = await GetTwoOptionQuestionAnswerDifference(question);
         const difficulty = GetTwoOptionQuestionDifficulty(difference);
         diffArr[difficulty].push((question));
     }
-    
-    return diffArr;
+}
+
+async function SplitThreeOptionQuestionsIntoDifficulties(questions, diffArr) {
+    for(let question of questions) {
+        const difficulty = await GetThreeOptionQuestionDifficulty(question);
+        diffArr[difficulty].push((question));
+    }
+}
+
+async function SplitFourOptionQuestionsIntoDifficulties(questions, diffArr) {
+    for(let question of questions) {
+        const difficulty = await GetFourOptionQuestionDifficulty(question);
+        diffArr[difficulty].push((question));
+    }
 }
 
 
@@ -336,11 +393,30 @@ function GetQuestionAuthor(question) {
 
 
 
+function GetByURLUsableQuestionTitle(questionTitle) {
+    const questionEndsInQuestionMark = questionTitle[questionTitle.length-1] === "?";
+    if(questionEndsInQuestionMark)
+        questionTitle = questionTitle.slice(0,-1);
+    let questionTitleUsableByURL = questionTitle.replace(/\//g, "dbgSlash")
+                                                .replace(/#/g, "dbgHashtag")
+                                                .replace(/\?/g, "dbgQuestionMark")
+    // if(questionEndsInQuestionMark)
+    //     questionTitleUsableByURL = questionTitleUsableByURL.concat("?");
+
+    return questionTitleUsableByURL;
+}
+
+
+function ParseBackFromURL(urlQuestion) {
+    return urlQuestion.replace(/dbgSlash/g, "/")
+                    .replace(/dbgHashtag/g, "#")
+                    .replace(/dbgQuestionMark/g, "?");
+}
 
 
 
 async function GetTwoOptionQuestionAnswerDifference(question) {
-    const nameDistribution = await GetNameDistribution(question);
+    const nameDistribution = await GetNameDistribution(question, 2);
 
     const firstKey = Object.keys(nameDistribution)[0];
     const secondKey = Object.keys(nameDistribution)[1];
@@ -365,11 +441,34 @@ function GetTwoOptionQuestionDifficulty(difference) {
         return "Good luck";
 }
 
-
-
-
 // 4/5 5/4  diff: 1     4/4     diff: 0     Easy
 // 3/6 6/3  diff: 3     3/5 5/3 diff: 2     Mid
 // 2/7 7/2  diff: 5     2/6 6/2 diff: 4     Hard
 // 1/8 8/1  diff: 7     1/7 7/1 diff: 6     Good luck
 // 0/9 9/0  diff: 9     0/8 8/0 diff: 8     Good luck
+
+async function GetThreeOptionQuestionDifficulty(question) {
+    const nameDistribution = await GetNameDistribution(question, 3);
+
+    for(const names of Object.values(nameDistribution)) {
+        if(names.length == 1)
+            return "Good luck";
+    }
+    return "Hard";
+}
+
+// 2/3/3               Hard 
+// 1/4/3 1/2/5 1/1/6   Good luck
+
+async function GetFourOptionQuestionDifficulty(question) {
+    const nameDistribution = await GetNameDistribution(question, 4);
+
+    for(const names of Object.values(nameDistribution)) {
+        if(names.length == 1)
+            return "Good luck";
+    }
+    return "Hard";
+}
+
+// 2/?/?/?  Hard
+// 1/?/?/?  Good luck
