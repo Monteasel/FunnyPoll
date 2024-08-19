@@ -1,5 +1,5 @@
 .graph {
-    width: 1500px;
+    width: 80%;
     height: 800px;
     margin: 0 auto;
     display: block;
@@ -9,14 +9,14 @@
     color: white;
     text-align: center;
     font-size: 40px;
-    width: 800px;
+    width: 50%;
     margin: 0 auto;
     margin-top: 50px;
 }
 
 .allChooserGroups {
     display: none;
-    margin: 0 550px;
+    margin: 0 18%;
     color: white;
     text-align: center;
     font-size: 30px;

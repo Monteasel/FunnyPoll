@@ -301,12 +301,12 @@ async function GetQuestionOptions(question, optionAmount) {
     return questionOptions;
 }
 
-async function GetNameDistribution(question, optionAmount, includeEmptyFields) {
+async function GetNameDistribution(question, optionAmount, includeEmptyFieldsIfPresent) {
     let nameDistribution = {};
     const options = await GetQuestionOptions(question, optionAmount);
     options.sort();
 
-    if(includeEmptyFields) {
+    if(includeEmptyFieldsIfPresent) {
         for(const row of cachedAnswerRows) {
             if(row.get(question) === undefined) {
                 nameDistribution["!"] = {};   
@@ -315,12 +315,10 @@ async function GetNameDistribution(question, optionAmount, includeEmptyFields) {
     }
 
     for(const option of options) {
-        console.log("option: " + option);
         nameDistribution[option] = [];
         for(const row of cachedAnswerRows) {
-            if(row.get(question) === option) {
+            if(row.get(question) === option.trim()) {
                 const name = row.get("Name");
-                console.log("name: " + name);
                 nameDistribution[option].push(name);
             }
         }
@@ -400,6 +398,12 @@ function GetByURLUsableQuestionTitle(questionTitle) {
     let questionTitleUsableByURL = questionTitle.replace(/\//g, "dbgSlash")
                                                 .replace(/#/g, "dbgHashtag")
                                                 .replace(/\?/g, "dbgQuestionMark")
+                                                .replace(/%/g, "dbgPercent")
+                                                .replace(/:/g, "dbgColon")
+                                                .replace(/@/g, "dbgAtSign")
+                                                .replace(/&/g, "dbgAmpersand")
+                                                .replace(/=/g, "dbgEqualsSign");
+
     // if(questionEndsInQuestionMark)
     //     questionTitleUsableByURL = questionTitleUsableByURL.concat("?");
 
@@ -410,7 +414,12 @@ function GetByURLUsableQuestionTitle(questionTitle) {
 function ParseBackFromURL(urlQuestion) {
     return urlQuestion.replace(/dbgSlash/g, "/")
                     .replace(/dbgHashtag/g, "#")
-                    .replace(/dbgQuestionMark/g, "?");
+                    .replace(/dbgQuestionMark/g, "?")
+                    .replace(/dbgPercent/g, "%")
+                    .replace(/dbgColon/g, ":")
+                    .replace(/dbgAtSign/g, "@")
+                    .replace(/dbgAmpersand/g, "&")
+                    .replace(/dbgEqualsSign/g, "=");
 }
 
 
